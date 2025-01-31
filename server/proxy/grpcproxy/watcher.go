@@ -48,6 +48,9 @@ type watcher struct {
 
 	// wps is the parent.
 	wps *watchProxyStream
+
+	// used for caching
+	clusterId uint64
 }
 
 // send filters out repeated events by discarding revisions older

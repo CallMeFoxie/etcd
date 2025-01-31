@@ -110,7 +110,7 @@ func (wb *watchBroadcast) add(w *watcher) bool {
 	// already sent by etcd; emulate create event
 	ok := w.post(&pb.WatchResponse{
 		Header: &pb.ResponseHeader{
-			// todo: fill in ClusterId
+			ClusterId: w.clusterId,
 			// todo: fill in MemberId:
 			Revision: w.nextrev,
 			// todo: fill in RaftTerm:

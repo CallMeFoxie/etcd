@@ -21,7 +21,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.etcd.io/etcd/client/v3/naming/endpoints"
 )

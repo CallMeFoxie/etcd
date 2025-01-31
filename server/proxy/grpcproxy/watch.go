@@ -25,7 +25,7 @@ import (
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3rpc"
 )
 
@@ -207,7 +207,7 @@ func (wps *watchProxyStream) close() {
 	close(wps.watchCh)
 }
 
-func (wps *watchProxyStream) checkPermissionForWatch(key, rangeEnd []byte) error {
+func (wps *watchProxyStream) checkPermissionForWatch(key, rangeEnd []byte) (error, uint64) {
 	if len(key) == 0 {
 		// If the length of the key is 0, we need to obtain full range.
 		// look at clientv3.WithPrefix()
@@ -221,8 +221,11 @@ func (wps *watchProxyStream) checkPermissionForWatch(key, rangeEnd []byte) error
 		CountOnly:    true,
 		Limit:        1,
 	}
-	_, err := wps.kv.Do(wps.ctx, RangeRequestToOp(req))
-	return err
+	resp, err := wps.kv.Do(wps.ctx, RangeRequestToOp(req))
+	if err != nil {
+		return err, 0
+	}
+	return err, resp.Get().Header.ClusterId
 }
 
 func (wps *watchProxyStream) recvLoop() error {
@@ -235,7 +238,9 @@ func (wps *watchProxyStream) recvLoop() error {
 		case *pb.WatchRequest_CreateRequest:
 			cr := uv.CreateRequest
 
-			if err := wps.checkPermissionForWatch(cr.Key, cr.RangeEnd); err != nil {
+			err, clusterId := wps.checkPermissionForWatch(cr.Key, cr.RangeEnd)
+
+			if err != nil {
 				wps.watchCh <- &pb.WatchResponse{
 					Header:       &pb.ResponseHeader{},
 					WatchId:      clientv3.InvalidWatchID,
@@ -252,10 +257,11 @@ func (wps *watchProxyStream) recvLoop() error {
 				id:  wps.nextWatcherID,
 				wps: wps,
 
-				nextrev:  cr.StartRevision,
-				progress: cr.ProgressNotify,
-				prevKV:   cr.PrevKv,
-				filters:  v3rpc.FiltersFromRequest(cr),
+				nextrev:   cr.StartRevision,
+				progress:  cr.ProgressNotify,
+				prevKV:    cr.PrevKv,
+				filters:   v3rpc.FiltersFromRequest(cr),
+				clusterId: clusterId,
 			}
 			if !w.wr.valid() {
 				w.post(&pb.WatchResponse{WatchId: clientv3.InvalidWatchID, Created: true, Canceled: true})
